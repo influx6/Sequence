@@ -2,6 +2,7 @@ package sequence
 
 import (
 	"errors"
+	"log"
 	"sync"
 )
 
@@ -61,6 +62,12 @@ type RootSequencable interface {
 type ListSequencable interface {
 	// Sequencable
 	Obj() []interface{}
+}
+
+//MapSequencable defines MapSequence method rules
+type MapSequencable interface {
+	// Sequencable
+	Obj() map[interface{}]interface{}
 }
 
 //IterableSequence is the root level of immutable sequence types
@@ -154,20 +161,29 @@ type SeqWriter struct {
 //Stack adds a function call into the writer stack
 func (l *SeqWriter) Stack(fn func()) {
 	l.write <- fn
-	l.Flush()
+	// l.Flush()
 }
 
 //Flush begins writing or else ignores if write already started and inprocess
 func (l *SeqWriter) Flush() {
 	l.lock.Lock()
+	defer l.lock.Unlock()
+	log.Println("chan size", len(l.write))
+
 	for fx := range l.write {
 		fx()
+		log.Println("executing:", fx)
 	}
-	l.lock.Unlock()
+
+	log.Println("done executing")
 }
 
 //NewSeqWriter returns a new Sequence writer for concurrent use
 func NewSeqWriter(size int) *SeqWriter {
+	if size <= 0 {
+		size = MINBUFF
+	}
+
 	return &SeqWriter{
 		make(chan func(), size),
 		new(sync.Mutex),
@@ -430,6 +446,7 @@ func (l *ListSequence) Length() int {
 func (l *ListSequence) Add(f ...interface{}) RootSequencable {
 	l.writer.Stack(func() {
 		l.data = append(l.data, f...)
+		log.Println("added items")
 	})
 	l.writer.Flush()
 	return l

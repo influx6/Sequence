@@ -326,8 +326,7 @@ func (l *ListSequence) Delete(f ...interface{}) Sequencable {
 type MapIterator struct {
 	Iterable
 	data    map[interface{}]interface{}
-	updater func(*MapIterator) int
-	size    int
+	updater func(*MapIterator)
 }
 
 //GrabKeys returns a list of the given map keys
@@ -348,13 +347,12 @@ func NewMapIterator(m map[interface{}]interface{}) *MapIterator {
 	keys := GrabKeys(m)
 	kit := NewListIterator(keys)
 
-	upd := func(f *MapIterator) int {
+	upd := func(f *MapIterator) {
 		keys = GrabKeys(f.data)
 		f.Iterable = NewListIterator(keys)
-		return len(keys)
 	}
 
-	return &MapIterator{Iterable(kit), m, upd, 0}
+	return &MapIterator{Iterable(kit), m, upd}
 }
 
 //NewReverseMapIterator returns a new mapiterator for use
@@ -362,13 +360,12 @@ func NewReverseMapIterator(m map[interface{}]interface{}) *MapIterator {
 	keys := GrabKeys(m)
 	kit := NewReverseListIterator(keys)
 
-	upd := func(f *MapIterator) int {
+	upd := func(f *MapIterator) {
 		keys = GrabKeys(f.data)
 		f.Iterable = NewReverseListIterator(keys)
-		return len(keys)
 	}
 
-	return &MapIterator{Iterable(kit), m, upd, 0}
+	return &MapIterator{Iterable(kit), m, upd}
 }
 
 //BaseIterator handles interation over an iterator
@@ -458,8 +455,8 @@ type ListIterator struct {
 //Next moves to the next item
 func (m *MapIterator) Next() error {
 	err := m.Iterable.Next()
-	if m.size != len(m.data) {
-		m.size = m.updater(m)
+	if m.Iterable.Length() != len(m.data) {
+		m.updater(m)
 	}
 	return err
 }

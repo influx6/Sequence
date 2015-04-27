@@ -39,7 +39,8 @@ type Iterable interface {
 //Sequencable defines a sequence method rules
 type Sequencable interface {
 	Iterator() Iterable
-	// Seq() Sequencable
+	Seq() Sequencable
+	RootSeq() RootSequencable
 }
 
 //RootSequencable defines the method rules for a root sequence(list/map)
@@ -52,6 +53,8 @@ type RootSequencable interface {
 	Delete(...interface{}) RootSequencable
 	Get(interface{}) interface{}
 	Clone() RootSequencable
+	Keys() RootSequencable
+	Values() RootSequencable
 }
 
 //ListSequencable defines ListSequence method rules
@@ -69,6 +72,30 @@ type IterableSequence struct {
 //Iterator returns a new base iterator for the sequence
 func (t *IterableSequence) Iterator() Iterable {
 	return IdentityIterator(t.iterator)
+}
+
+//Seq returns a new base iterator for the sequence
+func (t *IterableSequence) Seq() Sequencable {
+	return Sequencable(t)
+}
+
+//RootSeq returns a new base iterator for the sequence
+func (t *IterableSequence) RootSeq() RootSequencable {
+	mp := NewMapSequence(nil, 0)
+	it := t.iterator.Clone()
+
+	for it.HasNext() {
+
+		err := it.Next()
+
+		if err == ErrENDINDEX {
+			break
+		}
+
+		mp.Add(it.Key(), it.Value())
+	}
+
+	return mp
 }
 
 //NewIterableSequence returns a new sequence based off an iterable
@@ -91,6 +118,22 @@ func (s *Sequence) Iterator() Iterable {
 		return nil
 	}
 	return s.parent.Iterator()
+}
+
+//Seq returns a sequencable
+func (s *Sequence) Seq() Sequencable {
+	if s.parent == nil {
+		return nil
+	}
+	return s.parent.Seq()
+}
+
+//RootSeq returns a sequencable
+func (s *Sequence) RootSeq() RootSequencable {
+	if s.parent == nil {
+		return nil
+	}
+	return s.parent.RootSeq()
 }
 
 // //Length returns the length of the sequence
@@ -200,6 +243,11 @@ func (l *MapSequence) Seq() Sequencable {
 	return Sequencable(l)
 }
 
+//RootSeq returns the root sequence as a sequencable
+func (l *MapSequence) RootSeq() RootSequencable {
+	return l
+}
+
 //Get retrieves the value
 func (l *MapSequence) Get(d interface{}) interface{} {
 	return l.data[d]
@@ -258,6 +306,38 @@ func (l *MapSequence) Delete(f ...interface{}) RootSequencable {
 	return l
 }
 
+//Values returns the values of this sequence as a sequencable
+func (l *MapSequence) Values() RootSequencable {
+	kl := NewListSequence(nil, 0)
+	it := l.Iterator()
+
+	for it.HasNext() {
+		err := it.Next()
+
+		if err != ErrBADINDEX {
+			kl.Add(it.Value())
+		}
+	}
+
+	return kl
+}
+
+//Keys returns the root sequence as a sequencable
+func (l *MapSequence) Keys() RootSequencable {
+	kl := NewListSequence(nil, 0)
+	it := l.Iterator()
+
+	for it.HasNext() {
+		err := it.Next()
+
+		if err != ErrBADINDEX {
+			kl.Add(it.Key())
+		}
+	}
+
+	return kl
+}
+
 //ListSequence represents a sequence for arrays,splice type structures
 type ListSequence struct {
 	*Sequence
@@ -288,6 +368,32 @@ func (l *ListSequence) Iterator() Iterable {
 //Seq returns the sequence as a sequencable
 func (l *ListSequence) Seq() Sequencable {
 	return Sequencable(l)
+}
+
+//RootSeq returns the root sequence as a sequencable
+func (l *ListSequence) RootSeq() RootSequencable {
+	return l
+}
+
+//Values returns the value of these sequence as a sequencable
+func (l *ListSequence) Values() RootSequencable {
+	return l
+}
+
+//Keys returns the root sequence as a sequencable
+func (l *ListSequence) Keys() RootSequencable {
+	kl := NewListSequence(nil, 0)
+	keys := l.Iterator()
+
+	for keys.HasNext() {
+		err := keys.Next()
+
+		if err != ErrBADINDEX {
+			kl.Add(keys.Key())
+		}
+	}
+
+	return kl
 }
 
 //Get retrieves the value

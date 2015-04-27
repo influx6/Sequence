@@ -33,19 +33,25 @@ type Iterable interface {
 	Value() interface{}
 	Reset()
 	Length() int
+	Clone() Iterable
 }
 
 //Sequencable defines a sequence method rules
 type Sequencable interface {
 	Iterator() Iterable
-	Get(interface{}) interface{}
-	Clear() Sequencable
+	// Seq() Sequencable
+}
+
+//RootSequencable defines the method rules for a root sequence(list/map)
+type RootSequencable interface {
+	Sequencable
 	Length() int
 	Mutate(MutFunc)
-	Clone() Sequencable
-	Seq() Sequencable
-	Add(...interface{}) Sequencable
-	Delete(...interface{}) Sequencable
+	Clear() RootSequencable
+	Add(...interface{}) RootSequencable
+	Delete(...interface{}) RootSequencable
+	Get(interface{}) interface{}
+	Clone() RootSequencable
 }
 
 //ListSequencable defines ListSequence method rules
@@ -54,9 +60,23 @@ type ListSequencable interface {
 	Obj() []interface{}
 }
 
-//ImmutableSequence is the root level of immutable sequence types
-type ImmutableSequence struct {
+//IterableSequence is the root level of immutable sequence types
+type IterableSequence struct {
 	*Sequence
+	iterator Iterable
+}
+
+//Iterator returns a new base iterator for the sequence
+func (t *IterableSequence) Iterator() Iterable {
+	return IdentityIterator(t.iterator)
+}
+
+//NewIterableSequence returns a new sequence based off an iterable
+func NewIterableSequence(f Iterable) *IterableSequence {
+	return &IterableSequence{
+		NewBaseSequence(0, nil),
+		f,
+	}
 }
 
 //Sequence is the root level structure for all sequence types
@@ -67,13 +87,19 @@ type Sequence struct {
 
 //Iterator returns the iterator of the sequence
 func (s *Sequence) Iterator() Iterable {
+	if s.parent == nil {
+		return nil
+	}
 	return s.parent.Iterator()
 }
 
-//Length returns the length of the sequence
-func (s *Sequence) Length() int {
-	return s.parent.Length()
-}
+// //Length returns the length of the sequence
+// func (s *Sequence) Length() int {
+// 	if s.parent == nil {
+// 		return 0
+// 	}
+// 	return s.parent.Length()
+// }
 
 //SeqWriter represents write operations to be performed on a sequence
 //created to avoid race conditions
@@ -180,7 +206,7 @@ func (l *MapSequence) Get(d interface{}) interface{} {
 }
 
 //Clone copies internal structure data
-func (l *MapSequence) Clone() Sequencable {
+func (l *MapSequence) Clone() RootSequencable {
 	// l.data = make([]interface{}, 0)
 	nd := make(map[interface{}]interface{})
 
@@ -192,9 +218,9 @@ func (l *MapSequence) Clone() Sequencable {
 }
 
 //Clear wipes internal structure data
-func (l *MapSequence) Clear() Sequencable {
+func (l *MapSequence) Clear() RootSequencable {
 	l.data = make(map[interface{}]interface{})
-	return l.Seq()
+	return l
 }
 
 //Length returns length of data
@@ -203,18 +229,18 @@ func (l *MapSequence) Length() int {
 }
 
 //Add for the ListSequence adds all supplied arguments at once to the list
-func (l *MapSequence) Add(f ...interface{}) Sequencable {
+func (l *MapSequence) Add(f ...interface{}) RootSequencable {
 	l.writer.Stack(func() {
 		key := f[0]
 		val := f[1]
 		l.data[key] = val
 	})
 	l.writer.Flush()
-	return l.Seq()
+	return l
 }
 
 //Delete for the ListSequence adds all supplied arguments at once to the list
-func (l *MapSequence) Delete(f ...interface{}) Sequencable {
+func (l *MapSequence) Delete(f ...interface{}) RootSequencable {
 	for _, v := range f {
 		l.writer.Stack(func() {
 			_, ok := l.data[v]
@@ -229,7 +255,7 @@ func (l *MapSequence) Delete(f ...interface{}) Sequencable {
 
 	l.writer.Flush()
 
-	return l.Seq()
+	return l
 }
 
 //ListSequence represents a sequence for arrays,splice type structures
@@ -276,7 +302,7 @@ func (l *ListSequence) Get(d interface{}) interface{} {
 }
 
 //Clone copies internal structure data
-func (l *ListSequence) Clone() Sequencable {
+func (l *ListSequence) Clone() RootSequencable {
 	// l.data = make([]interface{}, 0)
 	nd := make([]interface{}, l.Length())
 	copy(nd, l.data)
@@ -284,9 +310,9 @@ func (l *ListSequence) Clone() Sequencable {
 }
 
 //Clear wipes internal structure data
-func (l *ListSequence) Clear() Sequencable {
+func (l *ListSequence) Clear() RootSequencable {
 	l.data = make([]interface{}, 0)
-	return l.Seq()
+	return l
 }
 
 //Length returns length of data
@@ -295,21 +321,21 @@ func (l *ListSequence) Length() int {
 }
 
 //Add for the ListSequence adds all supplied arguments at once to the list
-func (l *ListSequence) Add(f ...interface{}) Sequencable {
+func (l *ListSequence) Add(f ...interface{}) RootSequencable {
 	l.writer.Stack(func() {
 		l.data = append(l.data, f...)
 	})
 	l.writer.Flush()
-	return l.Seq()
+	return l
 }
 
 //Delete for the ListSequence adds all supplied arguments at once to the list
-func (l *ListSequence) Delete(f ...interface{}) Sequencable {
+func (l *ListSequence) Delete(f ...interface{}) RootSequencable {
 	for _, v := range f {
 		ind, ok := v.(int)
 
 		if !ok {
-			return l.Seq()
+			return l
 		}
 
 		l.writer.Stack(func() {
@@ -319,7 +345,7 @@ func (l *ListSequence) Delete(f ...interface{}) Sequencable {
 	}
 	l.writer.Flush()
 
-	return l.Seq()
+	return l
 }
 
 //MapIterator provides an iterator for the map structure
@@ -387,7 +413,7 @@ func IdentityIterator(b Iterable) *BaseIterator {
 //NewBaseIterator returns a base iterator based on a function evaluator
 func NewBaseIterator(b Iterable, fn ProcFunc) *BaseIterator {
 	return &BaseIterator{
-		b,
+		b.Clone(),
 		nil,
 		nil,
 		fn,
@@ -446,6 +472,11 @@ func (l *BaseIterator) Length() int {
 	return l.parent.Length()
 }
 
+//Clone returns a new iterator off that data
+func (l *BaseIterator) Clone() Iterable {
+	return NewBaseIterator(l.parent, l.proc)
+}
+
 //ListIterator handles interator over arrays,slices
 type ListIterator struct {
 	data  []interface{}
@@ -475,6 +506,11 @@ func (m *MapIterator) Key() interface{} {
 //Length returns the iterators targets length,not its operation length
 func (m *MapIterator) Length() int {
 	return len(m.data)
+}
+
+//Clone returns a new iterator off that data
+func (m *MapIterator) Clone() Iterable {
+	return NewMapIterator(m.data)
 }
 
 //ReverseListIterator returns a reverse iterator
@@ -509,6 +545,11 @@ func (r *ReverseListIterator) Value() interface{} {
 	return r.data[k]
 }
 
+//Clone returns a new iterator off that data
+func (r *ReverseListIterator) Clone() Iterable {
+	return NewReverseListIterator(r.data)
+}
+
 //NewListIterator returns a new iterator for the []interface{}
 func NewListIterator(b []interface{}) *ListIterator {
 	return &ListIterator{b, 0}
@@ -534,6 +575,11 @@ func (l *ListIterator) Next() error {
 //Length returns the iterators targets length,not its operation length
 func (l *ListIterator) Length() int {
 	return len(l.data)
+}
+
+//Clone returns a new iterable off this iterators data
+func (l *ListIterator) Clone() Iterable {
+	return NewListIterator(l.data)
 }
 
 //Reset reverst the iterators index

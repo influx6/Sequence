@@ -155,7 +155,7 @@ func (s *Sequence) RootSeq() RootSequencable {
 //created to avoid race conditions
 type SeqWriter struct {
 	write chan func()
-	lock  *sync.Mutex
+	lock  *sync.RWMutex
 }
 
 //Stack adds a function call into the writer stack
@@ -166,16 +166,18 @@ func (l *SeqWriter) Stack(fn func()) {
 
 //Flush begins writing or else ignores if write already started and inprocess
 func (l *SeqWriter) Flush() {
-	l.lock.Lock()
-	defer l.lock.Unlock()
-	log.Println("chan size", len(l.write))
-
-	for fx := range l.write {
-		fx()
-		log.Println("executing:", fx)
+	if len(l.write) <= 0 {
+		return
 	}
 
-	log.Println("done executing")
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
+	fx := <-l.write
+
+	fx()
+
+	l.Flush()
 }
 
 //NewSeqWriter returns a new Sequence writer for concurrent use
@@ -186,7 +188,7 @@ func NewSeqWriter(size int) *SeqWriter {
 
 	return &SeqWriter{
 		make(chan func(), size),
-		new(sync.Mutex),
+		new(sync.RWMutex),
 	}
 }
 

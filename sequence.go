@@ -298,6 +298,11 @@ func (l *MapSequence) Length() int {
 	return len(l.data)
 }
 
+//Obj returns the sequence data in the format of its input
+func (l *MapSequence) Obj() map[interface{}]interface{} {
+	return l.data
+}
+
 //Add for the ListSequence adds all supplied arguments at once to the list
 func (l *MapSequence) Add(f ...interface{}) RootSequencable {
 	l.writer.Stack(func() {
@@ -380,6 +385,11 @@ func (l *ListSequence) Mutate(fn MutFunc) {
 	})
 	l.writer.Flush()
 
+}
+
+//Obj returns the sequence data in the format of its input
+func (l *ListSequence) Obj() []interface{} {
+	return l.data
 }
 
 //Iterator returns the sequence data iterator
@@ -522,6 +532,80 @@ func NewReverseMapIterator(m map[interface{}]interface{}) *MapIterator {
 	}
 
 	return &MapIterator{Iterable(kit), m, upd}
+}
+
+//GenerativeIterator is the base iterator for creating custom iterator
+//behaviours
+type GenerativeIterator struct {
+	proc  ProcFunc
+	value interface{}
+	index interface{}
+	can   bool
+	count int
+}
+
+//NewGenerativeIterator returns a new GenerativeIterator
+func NewGenerativeIterator(p ProcFunc) *GenerativeIterator {
+	return &GenerativeIterator{
+		p,
+		nil,
+		nil,
+		true,
+		0,
+	}
+}
+
+//HasNext calls the next item
+func (l *GenerativeIterator) HasNext() bool {
+	return l.can
+}
+
+//Next moves to the next item
+func (l *GenerativeIterator) Next() error {
+	v, k, err := l.proc(l)
+
+	if err == ErrBADValue {
+		l.value = nil
+		l.index = nil
+		l.can = false
+		return ErrBADValue
+	}
+
+	if err == ErrENDINDEX {
+		l.can = false
+		return err
+	}
+
+	l.value = v
+	l.index = k
+	l.count++
+	return err
+}
+
+//Reset reverst the iterators index
+func (l *GenerativeIterator) Reset() {
+	l.value = nil
+	l.index = nil
+}
+
+//Key returns the current index of the iterator
+func (l *GenerativeIterator) Key() interface{} {
+	return l.index
+}
+
+//Value returns the value of the data with the index value
+func (l *GenerativeIterator) Value() interface{} {
+	return l.value
+}
+
+//Length returns the total time this iterator as generated values
+func (l *GenerativeIterator) Length() int {
+	return l.count
+}
+
+//Clone returns a new iterator off that data
+func (l *GenerativeIterator) Clone() Iterable {
+	return NewGenerativeIterator(l.proc)
 }
 
 //BaseIterator handles interation over an iterator

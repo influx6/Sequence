@@ -11,7 +11,7 @@
 
         if err != nil {
 	        t.Fatal("Error occcured with reverse list", err)
-		break		
+		break
 	}
 
 	ind, _ := li.Key().(int)
@@ -32,16 +32,45 @@
  cl := ls.Clone()
 
  //MapSequence structures for map items
- ms := NewMapSequence(nil, 0) 
+ ms := NewMapSequence(nil, 0)
  ms.Add(1, 'a')
  ms.Add(2, 'b')
  ms.Add(3, 'c')
- 
+
  ms.Delete(2)
- 
+
  ms.Get(3) //=> 'c'
- 
+
  ##Structures
  All sequence structures in truth work using iterator structures which provide the standard next(),value() and key() function methods to allow retrieval of the current state and these lends itself to be very powerful that apart from the focus structures like ListSequence and MapSequence provide an extendable and powerful approach without the need of intermediate generation of result, this means anything can be turned into a single if it provides an iterator that meets the #Sequence.Iterable interface
- 
- 
+
+
+###IncrementIterator
+
+```
+
+	incr := NewGenerativeIterator(func(p Iterable) (interface{}, interface{}, error) {
+		cur, _ := p.Value().(int)
+		key, _ := p.Key().(int)
+
+		if p.Value() == nil {
+			return cur, key, nil
+		}
+
+		cur++
+		key++
+		return cur, key, nil
+	})
+
+
+	for incr.HasNext() {
+		pv, _ := incr.Value().(int)
+		if pv >= 10 {
+			break
+		}
+
+		err := incr.Next()
+
+    log.Sprintf("Incremented from: %d to %d",pv,incr.Value())
+	}
+```

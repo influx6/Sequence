@@ -8,6 +8,43 @@ var (
 
 func TestSequence(t *testing.T) {
 
+	incr := NewGenerativeIterator(func(p Iterable) (interface{}, interface{}, error) {
+		cur, _ := p.Value().(int)
+		key, _ := p.Key().(int)
+
+		if p.Value() == nil {
+			return cur, key, nil
+		}
+
+		cur++
+		key++
+		return cur, key, nil
+	})
+
+	if incr == nil {
+		t.Fatal("Generative is not functioning", incr)
+	}
+
+	if incr.Length() != 0 {
+		t.Fatal("Generative Length is above 0 and already used", incr.Length(), incr)
+	}
+
+	pre := 0
+
+	for incr.HasNext() {
+		pv, _ := incr.Value().(int)
+		if pv >= 10 {
+			break
+		}
+
+		err := incr.Next()
+
+		if incr.Value() != pre {
+			t.Fatal("Incrementing value is not accurate:", err, pre, incr.Value(), incr.Key())
+		}
+
+		pre++
+	}
 }
 
 func TestList(t *testing.T) {
@@ -118,10 +155,23 @@ func TestListSequence(t *testing.T) {
 
 	ls.Add(1, 2, 4, 5)
 
+	incrementd := func(n int) {
+		i := n
+		size := n * 2
+		for i < size {
+			ls.Add(i)
+			i++
+		}
+	}
+
+	go incrementd(1)
+	go incrementd(3)
+
 	if ls.Length() != 4 {
 		t.Fatal("even after adding 4 items, list is empty", ls.Length(), ls)
 	}
 
+	//using the index
 	ls.Delete(2)
 
 	if ls.Length() != 3 {

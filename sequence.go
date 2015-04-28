@@ -1,9 +1,6 @@
 package sequence
 
-import (
-	"errors"
-	"sync"
-)
+import "errors"
 
 const (
 	//MINBUFF states the default minimum buffer size for the write channels
@@ -14,9 +11,9 @@ var (
 	//ErrBADValue represents a bad value calculation by the iterator
 	ErrBADValue = errors.New("Bad Value!")
 	//ErrBADINDEX represents a bad index counter by the iterator
-	ErrBADINDEX = errors.New("BadIndex!")
+	ErrBADINDEX = errors.New("Bad Index!")
 	//ErrENDINDEX represents a reaching of the end of an iterator
-	ErrENDINDEX = errors.New("EndIndex!")
+	ErrENDINDEX = errors.New("End Index!")
 )
 
 //MutFunc is the type of a function whoes argument is a Sequencable
@@ -158,29 +155,30 @@ func (s *Sequence) RootSeq() RootSequencable {
 //SeqWriter represents write operations to be performed on a sequence
 //created to avoid race conditions
 type SeqWriter struct {
-	write chan func()
-	lock  *sync.RWMutex
+	write  chan func()
+	locked bool
 }
 
 //Stack adds a function call into the writer stack
 func (l *SeqWriter) Stack(fn func()) {
 	l.write <- fn
-	// l.Flush()
+	if l.locked {
+		l.Flush()
+	}
 }
 
 //Flush begins writing or else ignores if write already started and inprocess
 func (l *SeqWriter) Flush() {
 	if len(l.write) <= 0 {
+		l.locked = false
 		return
 	}
-
-	l.lock.Lock()
-	defer l.lock.Unlock()
 
 	fx := <-l.write
 
 	fx()
 
+	l.locked = true
 	l.Flush()
 }
 
@@ -192,7 +190,7 @@ func NewSeqWriter(size int) *SeqWriter {
 
 	return &SeqWriter{
 		make(chan func(), size),
-		new(sync.RWMutex),
+		false,
 	}
 }
 
@@ -252,7 +250,7 @@ func (l *MapSequence) Mutate(fn MutFunc) {
 
 		l.data = res
 	})
-	l.writer.Flush()
+	// l.writer.Flush()
 }
 
 //Iterator returns the sequence data iterator
@@ -310,7 +308,7 @@ func (l *MapSequence) Add(f ...interface{}) RootSequencable {
 		val := f[1]
 		l.data[key] = val
 	})
-	l.writer.Flush()
+	// l.writer.Flush()
 	return l
 }
 
@@ -328,7 +326,7 @@ func (l *MapSequence) Delete(f ...interface{}) RootSequencable {
 		})
 	}
 
-	l.writer.Flush()
+	// l.writer.Flush()
 
 	return l
 }
@@ -383,7 +381,7 @@ func (l *ListSequence) Mutate(fn MutFunc) {
 
 		l.data = res
 	})
-	l.writer.Flush()
+	// l.writer.Flush()
 
 }
 
@@ -465,7 +463,7 @@ func (l *ListSequence) Add(f ...interface{}) RootSequencable {
 	l.writer.Stack(func() {
 		l.data = append(l.data, f...)
 	})
-	l.writer.Flush()
+	// l.writer.Flush()
 	return l
 }
 
@@ -483,7 +481,7 @@ func (l *ListSequence) Delete(f ...interface{}) RootSequencable {
 		})
 
 	}
-	l.writer.Flush()
+	// l.writer.Flush()
 
 	return l
 }
@@ -586,6 +584,7 @@ func (l *GenerativeIterator) Next() error {
 func (l *GenerativeIterator) Reset() {
 	l.value = nil
 	l.index = nil
+	l.count = 0
 }
 
 //Key returns the current index of the iterator

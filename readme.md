@@ -3,6 +3,8 @@
 
 ##Example
 
+```
+
  data = []interface{}{1, 32, 56, 7}
  li := NewListIterator(data)
 
@@ -41,7 +43,9 @@
 
  ms.Get(3) //=> 'c'
 
- ##Structures
+```
+
+##Structures
  All sequence structures in truth work using iterator structures which provide the standard next(),value() and key() function methods to allow retrieval of the current state and these lends itself to be very powerful that apart from the focus structures like ListSequence and MapSequence provide an extendable and powerful approach without the need of intermediate generation of result, this means anything can be turned into a single if it provides an iterator that meets the #Sequence.Iterable interface
 
 

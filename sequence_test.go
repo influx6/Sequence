@@ -103,3 +103,36 @@ func TestListSequence(t *testing.T) {
 
 	}
 }
+
+func TestMapSequence(t *testing.T) {
+	ls := NewMapSequence(nil, 0)
+
+	if ls == nil {
+		t.Fatal("recevied nil instead of ListSequence", ls)
+	}
+
+	if ls.Length() != 0 {
+		t.Fatal("length of new list sequence is not 0", ls.Length(), ls)
+	}
+
+	ls.Add(1, 'a')
+	ls.Add(2, 'b')
+	ls.Add(3, 'c')
+
+	if ls.Length() != 3 {
+		t.Fatal("even after adding 4 items, list is empty", ls.Length(), ls)
+	}
+
+	ls.Delete(2)
+
+	if ls.Length() != 2 {
+		t.Fatal("even after deleting 4 items, list is empty", ls.Length(), ls)
+	}
+
+	t2 := ls.Get(2)
+
+	if t2 != nil {
+		t.Fatalf("after removal ,value at index %d should be 5 but it is %d", 2, t2)
+	}
+
+}

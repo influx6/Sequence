@@ -2,8 +2,15 @@ package sequence
 
 import "testing"
 
+var (
+	data = []interface{}{1, 32, 56, 7}
+)
+
+func TestSequence(t *testing.T) {
+
+}
+
 func TestList(t *testing.T) {
-	data := []interface{}{1, 32, 56, 7}
 	li := NewListIterator(data)
 
 	for li.HasNext() {
@@ -16,6 +23,31 @@ func TestList(t *testing.T) {
 
 		ind, _ := li.Key().(int)
 		if li.Value() != data[ind] {
+			t.Fatal("Index and value incorrect with list", li.Key(), li.Value(), data)
+			break
+		}
+	}
+
+}
+
+func TestBaseIterator(t *testing.T) {
+	li := NewListIterator(data)
+	bl := IdentityIterator(li)
+
+	if bl == nil {
+		t.Fatal("BaseIterator can not be equal to its source", li, bl)
+	}
+
+	for bl.HasNext() {
+		err := bl.Next()
+
+		if err != nil {
+			t.Fatal("Error occcured with reverse list", err)
+			break
+		}
+
+		ind, _ := bl.Key().(int)
+		if bl.Value() != data[ind] {
 			t.Fatal("Index and value incorrect with list", li.Key(), li.Value(), data)
 			break
 		}
@@ -100,7 +132,24 @@ func TestListSequence(t *testing.T) {
 
 	if t2 != 5 {
 		t.Fatalf("after removal ,value at index %d should be 5 but it is %d", 2, t2)
+	}
 
+	cl := ls.Clone()
+
+	if cl.Length() != ls.Length() {
+		t.Fatalf("clone must be the same length as origin")
+	}
+
+	if cl.Get(0) != ls.Get(0) {
+		t.Fatalf("clone first index is not equal with source")
+	}
+
+	if ls.RootSeq() != ls {
+		t.Fatal("rootseq() must returns itself")
+	}
+
+	if ls.Seq() != ls {
+		t.Fatal("Seq() must wrap itself and must be equal itself")
 	}
 }
 
@@ -135,4 +184,21 @@ func TestMapSequence(t *testing.T) {
 		t.Fatalf("after removal ,value at index %d should be 5 but it is %d", 2, t2)
 	}
 
+	cl := ls.Clone()
+
+	if cl.Length() != ls.Length() {
+		t.Fatalf("clone must be the same length as origin")
+	}
+
+	if cl.Get(1) != ls.Get(1) {
+		t.Fatalf("clone first index is not equal with source")
+	}
+
+	if ls.RootSeq() != ls {
+		t.Fatal("rootseq() must returns itself")
+	}
+
+	if ls.Seq() != ls {
+		t.Fatal("Seq() must wrap itself and must be equal itself")
+	}
 }

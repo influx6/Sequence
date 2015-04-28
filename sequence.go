@@ -75,6 +75,11 @@ type IterableSequence struct {
 	iterator Iterable
 }
 
+//MixSequence takes a sequence and returns a sequence based on its iterator
+func MixSequence(s Sequencable) Sequencable {
+	return NewIterableSequence(s.Iterator())
+}
+
 //Iterator returns a new base iterator for the sequence
 func (t *IterableSequence) Iterator() Iterable {
 	return IdentityIterator(t.iterator)

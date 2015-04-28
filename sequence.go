@@ -2,7 +2,6 @@ package sequence
 
 import (
 	"errors"
-	"log"
 	"sync"
 )
 
@@ -422,7 +421,9 @@ func (l *ListSequence) Get(d interface{}) interface{} {
 		return nil
 	}
 
-	return l.data[dd]
+	val := l.data[dd]
+
+	return val
 }
 
 //Clone copies internal structure data
@@ -448,7 +449,6 @@ func (l *ListSequence) Length() int {
 func (l *ListSequence) Add(f ...interface{}) RootSequencable {
 	l.writer.Stack(func() {
 		l.data = append(l.data, f...)
-		log.Println("added items")
 	})
 	l.writer.Flush()
 	return l
@@ -464,7 +464,7 @@ func (l *ListSequence) Delete(f ...interface{}) RootSequencable {
 		}
 
 		l.writer.Stack(func() {
-			l.data = append(l.data[:ind], l.data[ind+1:])
+			l.data = append(l.data[:ind], l.data[ind+1:]...)
 		})
 
 	}

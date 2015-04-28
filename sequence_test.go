@@ -89,4 +89,17 @@ func TestListSequence(t *testing.T) {
 	if ls.Length() != 4 {
 		t.Fatal("even after adding 4 items, list is empty", ls.Length(), ls)
 	}
+
+	ls.Delete(2)
+
+	if ls.Length() != 3 {
+		t.Fatal("even after deleting 4 items, list is empty", ls.Length(), ls)
+	}
+
+	t2 := ls.Get(2)
+
+	if t2 != 5 {
+		t.Fatalf("after removal ,value at index %d should be 5 but it is %d", 2, t2)
+
+	}
 }

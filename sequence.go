@@ -1,6 +1,9 @@
 package sequence
 
-import "errors"
+import (
+	"errors"
+	"log"
+)
 
 const (
 	//MINBUFF states the default minimum buffer size for the write channels
@@ -162,23 +165,26 @@ type SeqWriter struct {
 //Stack adds a function call into the writer stack
 func (l *SeqWriter) Stack(fn func()) {
 	l.write <- fn
-	if l.locked {
+	log.Println("writing flush?", l.locked, "len:", len(l.write))
+	if !l.locked {
 		l.Flush()
+		log.Println("flushing, locked?", l.locked)
 	}
 }
 
 //Flush begins writing or else ignores if write already started and inprocess
 func (l *SeqWriter) Flush() {
 	if len(l.write) <= 0 {
-		l.locked = false
+		log.Println("no-more write work,channel empty")
+		// l.locked = false
 		return
 	}
 
+	l.locked = true
 	fx := <-l.write
 
 	fx()
 
-	l.locked = true
 	l.Flush()
 }
 

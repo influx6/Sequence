@@ -143,7 +143,7 @@ func TestMap(t *testing.T) {
 }
 
 func TestListSequence(t *testing.T) {
-	ls := NewListSequence(nil, 0)
+	ls := NewListSequence(nil, 3)
 
 	if ls == nil {
 		t.Fatal("recevied nil instead of ListSequence", ls)
@@ -166,6 +166,10 @@ func TestListSequence(t *testing.T) {
 
 	go incrementd(1)
 	go incrementd(3)
+
+	ls.writer.Flush()
+
+	t.Log("Length:", ls.Length())
 
 	if ls.Length() != 4 {
 		t.Fatal("even after adding 4 items, list is empty", ls.Length(), ls)

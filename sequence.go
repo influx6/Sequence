@@ -1,9 +1,7 @@
 package sequence
 
-import (
-	"errors"
-	"log"
-)
+import "errors"
+import "sync"
 
 const (
 	//MINBUFF states the default minimum buffer size for the write channels
@@ -120,7 +118,8 @@ func NewIterableSequence(f Iterable) *IterableSequence {
 //Sequence is the root level structure for all sequence types
 type Sequence struct {
 	parent Sequencable
-	writer *SeqWriter
+	// writer *SeqWriter
+	lock *sync.RWMutex
 }
 
 //Iterator returns the iterator of the sequence
@@ -157,48 +156,75 @@ func (s *Sequence) RootSeq() RootSequencable {
 
 //SeqWriter represents write operations to be performed on a sequence
 //created to avoid race conditions
-type SeqWriter struct {
-	write  chan func()
-	locked bool
-}
-
-//Stack adds a function call into the writer stack
-func (l *SeqWriter) Stack(fn func()) {
-	l.write <- fn
-	log.Println("writing flush?", l.locked, "len:", len(l.write))
-	if !l.locked {
-		l.Flush()
-		log.Println("flushing, locked?", l.locked)
-	}
-}
-
-//Flush begins writing or else ignores if write already started and inprocess
-func (l *SeqWriter) Flush() {
-	if len(l.write) <= 0 {
-		log.Println("no-more write work,channel empty")
-		// l.locked = false
-		return
-	}
-
-	l.locked = true
-	fx := <-l.write
-
-	fx()
-
-	l.Flush()
-}
-
-//NewSeqWriter returns a new Sequence writer for concurrent use
-func NewSeqWriter(size int) *SeqWriter {
-	if size <= 0 {
-		size = MINBUFF
-	}
-
-	return &SeqWriter{
-		make(chan func(), size),
-		false,
-	}
-}
+// type SeqWriter struct {
+// 	write  chan func()
+// 	locked bool
+// 	wait   *sync.WaitGroup
+// }
+//
+// //Stack adds a function call into the writer stack
+// func (l *SeqWriter) Stack(fn func()) {
+// 	l.write <- fn
+// 	l.wait.Add(1)
+// 	l.Flush()
+// }
+//
+// //Flush begins writing or else ignores if write already started and inprocess
+// func (l *SeqWriter) Flush() {
+// 	log.Println("current flush size:", len(l.write))
+//
+// 	if len(l.write) <= 0 {
+// 		return
+// 	}
+//
+// 	if l.locked {
+// 		if len(l.write) > 0 {
+// 			return
+// 		}
+// 	}
+//
+// 	log.Println("creating mini-queue:", len(l.write))
+//
+// 	l.locked = true
+// 	bl := make(chan func())
+//
+// 	go func() {
+// 		for fx := range bl {
+// 			fx()
+// 			l.wait.Done()
+// 		}
+// 	}()
+//
+// 	go func(){
+// 		s := len(l.write)
+// 		if s > 0 {
+// 			bl <-
+// 			s--
+// 		}
+// 	}()
+//
+// 	log.Println("will now wait!")
+// 	l.wait.Wait()
+//
+// 	l.locked = false
+// 	log.Println("done work!")
+// 	close(bl)
+// }
+//
+// //NewSeqWriter returns a new Sequence writer for concurrent use
+// func NewSeqWriter(size int) *SeqWriter {
+// 	if size <= 0 {
+// 		size = MINBUFF
+// 	}
+//
+// 	sw := &SeqWriter{
+// 		make(chan func(), size),
+// 		false,
+// 		new(sync.WaitGroup),
+// 	}
+//
+// 	return sw
+// }
 
 //NewBaseSequence returns a base sequence struct
 func NewBaseSequence(buff int, parent Sequencable) *Sequence {
@@ -208,7 +234,8 @@ func NewBaseSequence(buff int, parent Sequencable) *Sequence {
 
 	return &Sequence{
 		parent,
-		NewSeqWriter(buff),
+		// NewSeqWriter(buff),
+		new(sync.RWMutex),
 	}
 }
 
@@ -247,15 +274,17 @@ type MapSequence struct {
 
 //Mutate allows mutation on sequence data
 func (l *MapSequence) Mutate(fn MutFunc) {
-	l.writer.Stack(func() {
-		res, ok := fn(l.data).(map[interface{}]interface{})
+	// l.writer.Stack(func() {
+	l.lock.Lock()
+	res, ok := fn(l.data).(map[interface{}]interface{})
 
-		if !ok {
-			return
-		}
+	if !ok {
+		return
+	}
 
-		l.data = res
-	})
+	l.data = res
+	l.lock.Unlock()
+	// })
 	// l.writer.Flush()
 }
 
@@ -276,7 +305,10 @@ func (l *MapSequence) RootSeq() RootSequencable {
 
 //Get retrieves the value
 func (l *MapSequence) Get(d interface{}) interface{} {
-	return l.data[d]
+	l.lock.RLock()
+	f := l.data[d]
+	l.lock.RUnlock()
+	return f
 }
 
 //Clone copies internal structure data
@@ -299,38 +331,48 @@ func (l *MapSequence) Clear() RootSequencable {
 
 //Length returns length of data
 func (l *MapSequence) Length() int {
-	return len(l.data)
+	l.lock.RLock()
+	sz := len(l.data)
+	l.lock.RUnlock()
+	return sz
 }
 
 //Obj returns the sequence data in the format of its input
 func (l *MapSequence) Obj() map[interface{}]interface{} {
-	return l.data
+	l.lock.RLock()
+	m := l.data
+	l.lock.RUnlock()
+	return m
 }
 
 //Add for the ListSequence adds all supplied arguments at once to the list
 func (l *MapSequence) Add(f ...interface{}) RootSequencable {
-	l.writer.Stack(func() {
-		key := f[0]
-		val := f[1]
-		l.data[key] = val
-	})
+	// l.writer.Stack(func() {
+	l.lock.Lock()
+	key := f[0]
+	val := f[1]
+	l.data[key] = val
+	l.lock.Unlock()
+	// })
 	// l.writer.Flush()
 	return l
 }
 
 //Delete for the ListSequence adds all supplied arguments at once to the list
 func (l *MapSequence) Delete(f ...interface{}) RootSequencable {
+	l.lock.Lock()
 	for _, v := range f {
-		l.writer.Stack(func() {
-			_, ok := l.data[v]
+		// l.writer.Stack(func() {
+		_, ok := l.data[v]
 
-			if !ok {
-				return
-			}
+		if !ok {
+			return l
+		}
 
-			delete(l.data, v)
-		})
+		delete(l.data, v)
+		// })
 	}
+	l.lock.Unlock()
 
 	// l.writer.Flush()
 
@@ -378,22 +420,27 @@ type ListSequence struct {
 
 //Mutate allows mutation on sequence data
 func (l *ListSequence) Mutate(fn MutFunc) {
-	l.writer.Stack(func() {
-		res, ok := fn(l.data).([]interface{})
+	l.lock.Lock()
+	// l.writer.Stack(func() {
+	res, ok := fn(l.data).([]interface{})
 
-		if !ok {
-			return
-		}
+	if !ok {
+		return
+	}
 
-		l.data = res
-	})
+	l.data = res
+	// })
+	l.lock.Unlock()
 	// l.writer.Flush()
 
 }
 
 //Obj returns the sequence data in the format of its input
 func (l *ListSequence) Obj() []interface{} {
-	return l.data
+	l.lock.RLock()
+	d := l.data
+	l.lock.RUnlock()
+	return d
 }
 
 //Iterator returns the sequence data iterator
@@ -440,7 +487,9 @@ func (l *ListSequence) Get(d interface{}) interface{} {
 		return nil
 	}
 
+	l.lock.RLock()
 	val := l.data[dd]
+	l.lock.RUnlock()
 
 	return val
 }
@@ -461,14 +510,19 @@ func (l *ListSequence) Clear() RootSequencable {
 
 //Length returns length of data
 func (l *ListSequence) Length() int {
-	return len(l.data)
+	l.lock.RLock()
+	sz := len(l.data)
+	l.lock.RUnlock()
+	return sz
 }
 
 //Add for the ListSequence adds all supplied arguments at once to the list
 func (l *ListSequence) Add(f ...interface{}) RootSequencable {
-	l.writer.Stack(func() {
-		l.data = append(l.data, f...)
-	})
+	l.lock.Lock()
+	// l.writer.Stack(func() {
+	l.data = append(l.data, f...)
+	// })
+	l.lock.Unlock()
 	// l.writer.Flush()
 	return l
 }
@@ -476,15 +530,20 @@ func (l *ListSequence) Add(f ...interface{}) RootSequencable {
 //Delete for the ListSequence adds all supplied arguments at once to the list
 func (l *ListSequence) Delete(f ...interface{}) RootSequencable {
 	for _, v := range f {
-		ind, ok := v.(int)
+		i, ok := v.(int)
 
 		if !ok {
 			return l
 		}
 
-		l.writer.Stack(func() {
-			l.data = append(l.data[:ind], l.data[ind+1:]...)
-		})
+		// l.writer.Stack(func() {
+		// l.data = append(l.data[:ind], l.data[ind+1:]...)
+		l.lock.Lock()
+		copy(l.data[i:], l.data[i+1:])
+		l.data[len(l.data)-1] = nil
+		l.data = l.data[:len(l.data)-1]
+		l.lock.Unlock()
+		// })
 
 	}
 	// l.writer.Flush()

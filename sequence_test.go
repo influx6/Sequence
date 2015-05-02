@@ -167,15 +167,11 @@ func TestListSequence(t *testing.T) {
 	go incrementd(1)
 	go incrementd(3)
 
-	ls.writer.Flush()
-
-	t.Log("Length:", ls.Length())
-
 	if ls.Length() != 4 {
-		t.Fatal("even after adding 4 items, list is empty", ls.Length(), ls)
+		t.Fatal("even after adding 4 items, list is at 4 size", ls.Length(), ls)
 	}
 
-	//using the index
+	// using the index
 	ls.Delete(2)
 
 	if ls.Length() != 3 {

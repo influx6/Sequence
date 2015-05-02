@@ -450,10 +450,19 @@ func (l *ListSequence) Add(f ...interface{}) RootSequencable {
 
 //Delete for the ListSequence adds all supplied arguments at once to the list
 func (l *ListSequence) Delete(f ...interface{}) RootSequencable {
+	if len(l.data) <= 0 {
+		return l
+	}
+
 	for _, v := range f {
+
 		i, ok := v.(int)
 
 		if !ok {
+			return l
+		}
+
+		if i <= 0 && len(l.data) <= 0 {
 			return l
 		}
 

@@ -1,6 +1,7 @@
 package sequence
 
 import "errors"
+
 import "sync"
 
 const (
@@ -145,86 +146,6 @@ func (s *Sequence) RootSeq() RootSequencable {
 	}
 	return s.parent.RootSeq()
 }
-
-// //Length returns the length of the sequence
-// func (s *Sequence) Length() int {
-// 	if s.parent == nil {
-// 		return 0
-// 	}
-// 	return s.parent.Length()
-// }
-
-//SeqWriter represents write operations to be performed on a sequence
-//created to avoid race conditions
-// type SeqWriter struct {
-// 	write  chan func()
-// 	locked bool
-// 	wait   *sync.WaitGroup
-// }
-//
-// //Stack adds a function call into the writer stack
-// func (l *SeqWriter) Stack(fn func()) {
-// 	l.write <- fn
-// 	l.wait.Add(1)
-// 	l.Flush()
-// }
-//
-// //Flush begins writing or else ignores if write already started and inprocess
-// func (l *SeqWriter) Flush() {
-// 	log.Println("current flush size:", len(l.write))
-//
-// 	if len(l.write) <= 0 {
-// 		return
-// 	}
-//
-// 	if l.locked {
-// 		if len(l.write) > 0 {
-// 			return
-// 		}
-// 	}
-//
-// 	log.Println("creating mini-queue:", len(l.write))
-//
-// 	l.locked = true
-// 	bl := make(chan func())
-//
-// 	go func() {
-// 		for fx := range bl {
-// 			fx()
-// 			l.wait.Done()
-// 		}
-// 	}()
-//
-// 	go func(){
-// 		s := len(l.write)
-// 		if s > 0 {
-// 			bl <-
-// 			s--
-// 		}
-// 	}()
-//
-// 	log.Println("will now wait!")
-// 	l.wait.Wait()
-//
-// 	l.locked = false
-// 	log.Println("done work!")
-// 	close(bl)
-// }
-//
-// //NewSeqWriter returns a new Sequence writer for concurrent use
-// func NewSeqWriter(size int) *SeqWriter {
-// 	if size <= 0 {
-// 		size = MINBUFF
-// 	}
-//
-// 	sw := &SeqWriter{
-// 		make(chan func(), size),
-// 		false,
-// 		new(sync.WaitGroup),
-// 	}
-//
-// 	return sw
-// }
 
 //NewBaseSequence returns a base sequence struct
 func NewBaseSequence(buff int, parent Sequencable) *Sequence {
@@ -830,13 +751,15 @@ func (r *ReverseListIterator) Clone() Iterable {
 
 //NewListIterator returns a new iterator for the []interface{}
 func NewListIterator(b []interface{}) *ListIterator {
-	return &ListIterator{b, 0}
+	return &ListIterator{b, -1}
 }
 
 //HasNext calls the next item
 func (l *ListIterator) HasNext() bool {
-	if l.index <= 0 || l.index < (len(l.data)-1) {
-		return true
+	if len(l.data) > 0 {
+		if l.index < 0 || l.index < (len(l.data)-1) {
+			return true
+		}
 	}
 	return false
 }
@@ -862,7 +785,7 @@ func (l *ListIterator) Clone() Iterable {
 
 //Reset reverst the iterators index
 func (l *ListIterator) Reset() {
-	l.index = 0
+	l.index = -1
 }
 
 //Key returns the current index of the iterator

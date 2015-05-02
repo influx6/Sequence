@@ -47,6 +47,27 @@ func TestSequence(t *testing.T) {
 	}
 }
 
+func TestEmptyList(t *testing.T) {
+	li := NewListIterator(make([]interface{}, 0))
+
+	//will not work
+	for li.HasNext() {
+		err := li.Next()
+
+		if err != nil {
+			t.Fatal("Error occcured with reverse list", err)
+			break
+		}
+
+		ind, _ := li.Key().(int)
+		if li.Value() != data[ind] {
+			t.Fatal("Index and value incorrect with list", li.Key(), li.Value(), data)
+			break
+		}
+	}
+
+}
+
 func TestList(t *testing.T) {
 	li := NewListIterator(data)
 

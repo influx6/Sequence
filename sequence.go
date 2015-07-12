@@ -39,33 +39,70 @@ type Iterable interface {
 type Sequencable interface {
 	Iterator() Iterable
 	Seq() Sequencable
-	RootSeq() RootSequencable
+	// Value() interface{}
 }
 
 //RootSequencable defines the method rules for a root sequence(list/map)
-type RootSequencable interface {
+// type RootSequencable interface {
+// 	Sequencable
+// 	Length() int
+// 	Mutate(MutFunc)
+// 	Clear() RootSequencable
+// 	Add(...interface{}) RootSequencable
+// 	Delete(...interface{}) RootSequencable
+// 	Get(interface{}) interface{}
+// 	Clone() Sequencable
+// 	Keys() Sequencable
+// 	Values() Sequencable
+// }
+
+//MutateSequencable defines the methods of a sequence to be able to mutate
+type MutateSequencable interface {
 	Sequencable
-	Length() int
 	Mutate(MutFunc)
-	Clear() RootSequencable
-	Add(...interface{}) RootSequencable
-	Delete(...interface{}) RootSequencable
-	Get(interface{}) interface{}
-	Clone() RootSequencable
-	Keys() RootSequencable
-	Values() RootSequencable
+}
+
+//Sizable provides a length data member
+type Sizable interface {
+	Length() int
+}
+
+//SizableSequencable provides sequences with size detail
+type SizableSequencable interface {
+	Sequencable
+	Sizable
+}
+
+//MutableSizableSequencable provides sequences with size detail
+type MutableSizableSequencable interface {
+	MutateSequencable
+	Sizable
 }
 
 //ListSequencable defines ListSequence method rules
 type ListSequencable interface {
-	// Sequencable
+	MutableSizableSequencable
 	Obj() []interface{}
+	Clear() ListSequencable
+	Add(...interface{}) ListSequencable
+	Delete(...interface{}) ListSequencable
+	Get(interface{}) interface{}
+	Clone() ListSequencable
+	Keys() ListSequencable
+	Values() ListSequencable
 }
 
 //MapSequencable defines MapSequence method rules
 type MapSequencable interface {
-	// Sequencable
+	MutableSizableSequencable
 	Obj() map[interface{}]interface{}
+	Clear() MapSequencable
+	Add(...interface{}) MapSequencable
+	Delete(...interface{}) MapSequencable
+	Get(interface{}) interface{}
+	Clone() MapSequencable
+	Keys() ListSequencable
+	Values() ListSequencable
 }
 
 //IterableSequence is the root level of immutable sequence types
@@ -87,25 +124,6 @@ func (t *IterableSequence) Iterator() Iterable {
 //Seq returns a new base iterator for the sequence
 func (t *IterableSequence) Seq() Sequencable {
 	return Sequencable(t)
-}
-
-//RootSeq returns a new base iterator for the sequence
-func (t *IterableSequence) RootSeq() RootSequencable {
-	mp := NewMapSequence(nil, 0)
-	it := t.iterator.Clone()
-
-	for it.HasNext() {
-
-		err := it.Next()
-
-		if err == ErrENDINDEX {
-			break
-		}
-
-		mp.Add(it.Key(), it.Value())
-	}
-
-	return mp
 }
 
 //NewIterableSequence returns a new sequence based off an iterable
@@ -139,14 +157,6 @@ func (s *Sequence) Seq() Sequencable {
 	return s.parent.Seq()
 }
 
-//RootSeq returns a sequencable
-func (s *Sequence) RootSeq() RootSequencable {
-	if s.parent == nil {
-		return nil
-	}
-	return s.parent.RootSeq()
-}
-
 //NewBaseSequence returns a base sequence struct
 func NewBaseSequence(buff int, parent Sequencable) *Sequence {
 	if buff < MINBUFF {
@@ -155,7 +165,6 @@ func NewBaseSequence(buff int, parent Sequencable) *Sequence {
 
 	return &Sequence{
 		parent,
-		// NewSeqWriter(buff),
 		new(sync.RWMutex),
 	}
 }
@@ -195,7 +204,6 @@ type MapSequence struct {
 
 //Mutate allows mutation on sequence data
 func (l *MapSequence) Mutate(fn MutFunc) {
-	// l.writer.Stack(func() {
 	l.lock.Lock()
 	res, ok := fn(l.data).(map[interface{}]interface{})
 
@@ -205,8 +213,6 @@ func (l *MapSequence) Mutate(fn MutFunc) {
 
 	l.data = res
 	l.lock.Unlock()
-	// })
-	// l.writer.Flush()
 }
 
 //Iterator returns the sequence data iterator
@@ -219,11 +225,6 @@ func (l *MapSequence) Seq() Sequencable {
 	return Sequencable(l)
 }
 
-//RootSeq returns the root sequence as a sequencable
-func (l *MapSequence) RootSeq() RootSequencable {
-	return l
-}
-
 //Get retrieves the value
 func (l *MapSequence) Get(d interface{}) interface{} {
 	l.lock.RLock()
@@ -233,7 +234,7 @@ func (l *MapSequence) Get(d interface{}) interface{} {
 }
 
 //Clone copies internal structure data
-func (l *MapSequence) Clone() RootSequencable {
+func (l *MapSequence) Clone() MapSequencable {
 	// l.data = make([]interface{}, 0)
 	nd := make(map[interface{}]interface{})
 
@@ -245,7 +246,7 @@ func (l *MapSequence) Clone() RootSequencable {
 }
 
 //Clear wipes internal structure data
-func (l *MapSequence) Clear() RootSequencable {
+func (l *MapSequence) Clear() MapSequencable {
 	l.data = make(map[interface{}]interface{})
 	return l
 }
@@ -267,7 +268,7 @@ func (l *MapSequence) Obj() map[interface{}]interface{} {
 }
 
 //Add for the ListSequence adds all supplied arguments at once to the list
-func (l *MapSequence) Add(f ...interface{}) RootSequencable {
+func (l *MapSequence) Add(f ...interface{}) MapSequencable {
 	// l.writer.Stack(func() {
 	l.lock.Lock()
 	key := f[0]
@@ -280,10 +281,9 @@ func (l *MapSequence) Add(f ...interface{}) RootSequencable {
 }
 
 //Delete for the ListSequence adds all supplied arguments at once to the list
-func (l *MapSequence) Delete(f ...interface{}) RootSequencable {
+func (l *MapSequence) Delete(f ...interface{}) MapSequencable {
 	l.lock.Lock()
 	for _, v := range f {
-		// l.writer.Stack(func() {
 		_, ok := l.data[v]
 
 		if !ok {
@@ -291,17 +291,14 @@ func (l *MapSequence) Delete(f ...interface{}) RootSequencable {
 		}
 
 		delete(l.data, v)
-		// })
 	}
 	l.lock.Unlock()
-
-	// l.writer.Flush()
 
 	return l
 }
 
 //Values returns the values of this sequence as a sequencable
-func (l *MapSequence) Values() RootSequencable {
+func (l *MapSequence) Values() ListSequencable {
 	kl := NewListSequence(nil, 0)
 	it := l.Iterator()
 
@@ -317,7 +314,7 @@ func (l *MapSequence) Values() RootSequencable {
 }
 
 //Keys returns the root sequence as a sequencable
-func (l *MapSequence) Keys() RootSequencable {
+func (l *MapSequence) Keys() ListSequencable {
 	kl := NewListSequence(nil, 0)
 	it := l.Iterator()
 
@@ -342,7 +339,6 @@ type ListSequence struct {
 //Mutate allows mutation on sequence data
 func (l *ListSequence) Mutate(fn MutFunc) {
 	l.lock.Lock()
-	// l.writer.Stack(func() {
 	res, ok := fn(l.data).([]interface{})
 
 	if !ok {
@@ -350,10 +346,7 @@ func (l *ListSequence) Mutate(fn MutFunc) {
 	}
 
 	l.data = res
-	// })
 	l.lock.Unlock()
-	// l.writer.Flush()
-
 }
 
 //Obj returns the sequence data in the format of its input
@@ -374,18 +367,13 @@ func (l *ListSequence) Seq() Sequencable {
 	return Sequencable(l)
 }
 
-//RootSeq returns the root sequence as a sequencable
-func (l *ListSequence) RootSeq() RootSequencable {
-	return l
-}
-
 //Values returns the value of these sequence as a sequencable
-func (l *ListSequence) Values() RootSequencable {
+func (l *ListSequence) Values() ListSequencable {
 	return l
 }
 
 //Keys returns the root sequence as a sequencable
-func (l *ListSequence) Keys() RootSequencable {
+func (l *ListSequence) Keys() ListSequencable {
 	kl := NewListSequence(nil, 0)
 	keys := l.Iterator()
 
@@ -416,7 +404,7 @@ func (l *ListSequence) Get(d interface{}) interface{} {
 }
 
 //Clone copies internal structure data
-func (l *ListSequence) Clone() RootSequencable {
+func (l *ListSequence) Clone() ListSequencable {
 	// l.data = make([]interface{}, 0)
 	nd := make([]interface{}, l.Length())
 	copy(nd, l.data)
@@ -424,7 +412,7 @@ func (l *ListSequence) Clone() RootSequencable {
 }
 
 //Clear wipes internal structure data
-func (l *ListSequence) Clear() RootSequencable {
+func (l *ListSequence) Clear() ListSequencable {
 	l.data = make([]interface{}, 0)
 	return l
 }
@@ -438,18 +426,15 @@ func (l *ListSequence) Length() int {
 }
 
 //Add for the ListSequence adds all supplied arguments at once to the list
-func (l *ListSequence) Add(f ...interface{}) RootSequencable {
+func (l *ListSequence) Add(f ...interface{}) ListSequencable {
 	l.lock.Lock()
-	// l.writer.Stack(func() {
 	l.data = append(l.data, f...)
-	// })
 	l.lock.Unlock()
-	// l.writer.Flush()
 	return l
 }
 
 //Delete for the ListSequence adds all supplied arguments at once to the list
-func (l *ListSequence) Delete(f ...interface{}) RootSequencable {
+func (l *ListSequence) Delete(f ...interface{}) ListSequencable {
 	if len(l.data) <= 0 {
 		return l
 	}
@@ -466,17 +451,13 @@ func (l *ListSequence) Delete(f ...interface{}) RootSequencable {
 			return l
 		}
 
-		// l.writer.Stack(func() {
-		// l.data = append(l.data[:ind], l.data[ind+1:]...)
 		l.lock.Lock()
 		copy(l.data[i:], l.data[i+1:])
 		l.data[len(l.data)-1] = nil
 		l.data = l.data[:len(l.data)-1]
 		l.lock.Unlock()
-		// })
 
 	}
-	// l.writer.Flush()
 
 	return l
 }

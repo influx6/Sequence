@@ -215,10 +215,6 @@ func TestListSequence(t *testing.T) {
 		t.Fatalf("clone first index is not equal with source")
 	}
 
-	if ls.RootSeq() != ls {
-		t.Fatal("rootseq() must returns itself")
-	}
-
 	if ls.Seq() != ls {
 		t.Fatal("Seq() must wrap itself and must be equal itself")
 	}
@@ -263,10 +259,6 @@ func TestMapSequence(t *testing.T) {
 
 	if cl.Get(1) != ls.Get(1) {
 		t.Fatalf("clone first index is not equal with source")
-	}
-
-	if ls.RootSeq() != ls {
-		t.Fatal("rootseq() must returns itself")
 	}
 
 	if ls.Seq() != ls {

@@ -31,16 +31,14 @@ func TestSequence(t *testing.T) {
 
 	pre := 0
 
-	for incr.HasNext() {
+	for incr.Next() == nil {
 		pv, _ := incr.Value().(int)
 		if pv >= 10 {
 			break
 		}
 
-		err := incr.Next()
-
-		if incr.Value() != pre {
-			t.Fatal("Incrementing value is not accurate:", err, pre, incr.Value(), incr.Key())
+		if pre != incr.Value() {
+			t.Fatal("Incrementing value is not accurate:", pre, incr.Value(), incr.Key())
 		}
 
 		pre++
@@ -51,14 +49,7 @@ func TestEmptyList(t *testing.T) {
 	li := NewListIterator(make([]interface{}, 0))
 
 	//will not work
-	for li.HasNext() {
-		err := li.Next()
-
-		if err != nil {
-			t.Fatal("Error occcured with reverse list", err)
-			break
-		}
-
+	for li.Next() == nil {
 		ind, _ := li.Key().(int)
 		if li.Value() != data[ind] {
 			t.Fatal("Index and value incorrect with list", li.Key(), li.Value(), data)
@@ -71,14 +62,7 @@ func TestEmptyList(t *testing.T) {
 func TestList(t *testing.T) {
 	li := NewListIterator(data)
 
-	for li.HasNext() {
-		err := li.Next()
-
-		if err != nil {
-			t.Fatal("Error occcured with reverse list", err)
-			break
-		}
-
+	for li.Next() == nil {
 		ind, _ := li.Key().(int)
 		if li.Value() != data[ind] {
 			t.Fatal("Index and value incorrect with list", li.Key(), li.Value(), data)
@@ -96,13 +80,7 @@ func TestBaseIterator(t *testing.T) {
 		t.Fatal("BaseIterator can not be equal to its source", li, bl)
 	}
 
-	for bl.HasNext() {
-		err := bl.Next()
-
-		if err != nil {
-			t.Fatal("Error occcured with reverse list", err)
-			break
-		}
+	for bl.Next() == nil {
 
 		ind, _ := bl.Key().(int)
 		if bl.Value() != data[ind] {
@@ -116,14 +94,7 @@ func TestReverseList(t *testing.T) {
 	data := []interface{}{1, 32, 56, 7}
 	li := NewReverseListIterator(data)
 
-	for li.HasNext() {
-		err := li.Next()
-
-		if err != nil {
-			t.Fatal("Error occcured with reverse list", err)
-			break
-		}
-
+	for li.Next() == nil {
 		ind, _ := li.Key().(int)
 		if li.Value() != data[ind] {
 			t.Fatal("Index and value incorrect with list", li.Key(), li.Value(), data)
@@ -215,8 +186,8 @@ func TestListSequence(t *testing.T) {
 		t.Fatalf("clone first index is not equal with source")
 	}
 
-	if ls.Seq() != ls {
-		t.Fatal("Seq() must wrap itself and must be equal itself")
+	if ls.Parent() != ls {
+		t.Fatal("Parent() must wrap itself and must be equal itself")
 	}
 }
 
@@ -261,7 +232,7 @@ func TestMapSequence(t *testing.T) {
 		t.Fatalf("clone first index is not equal with source")
 	}
 
-	if ls.Seq() != ls {
-		t.Fatal("Seq() must wrap itself and must be equal itself")
+	if ls.Parent() != ls {
+		t.Fatal("Parent() must wrap itself and must be equal itself")
 	}
 }

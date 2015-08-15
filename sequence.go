@@ -27,7 +27,7 @@ type ProcFunc func(f Iterable) (interface{}, interface{}, error)
 //Iterable defines sequence method rules
 type Iterable interface {
 	Next() error
-	HasNext() bool
+	// HasNext() bool
 	Key() interface{}
 	Value() interface{}
 	Reset()
@@ -38,23 +38,9 @@ type Iterable interface {
 //Sequencable defines a sequence method rules
 type Sequencable interface {
 	Iterator() Iterable
-	Seq() Sequencable
+	Parent() Sequencable
 	// Value() interface{}
 }
-
-//RootSequencable defines the method rules for a root sequence(list/map)
-// type RootSequencable interface {
-// 	Sequencable
-// 	Length() int
-// 	Mutate(MutFunc)
-// 	Clear() RootSequencable
-// 	Add(...interface{}) RootSequencable
-// 	Delete(...interface{}) RootSequencable
-// 	Get(interface{}) interface{}
-// 	Clone() Sequencable
-// 	Keys() Sequencable
-// 	Values() Sequencable
-// }
 
 //MutateSequencable defines the methods of a sequence to be able to mutate
 type MutateSequencable interface {
@@ -121,9 +107,14 @@ func (t *IterableSequence) Iterator() Iterable {
 	return IdentityIterator(t.iterator)
 }
 
-//Seq returns a new base iterator for the sequence
-func (t *IterableSequence) Seq() Sequencable {
+//Parent returns a new base iterator for the sequence
+func (t *IterableSequence) Parent() Sequencable {
 	return Sequencable(t)
+}
+
+//Value returns a the final value of a sequence operation
+func (t *IterableSequence) Value() interface{} {
+	return t.iterator.Value()
 }
 
 //NewIterableSequence returns a new sequence based off an iterable
@@ -149,12 +140,12 @@ func (s *Sequence) Iterator() Iterable {
 	return s.parent.Iterator()
 }
 
-//Seq returns a sequencable
-func (s *Sequence) Seq() Sequencable {
+//Parent returns a sequencable
+func (s *Sequence) Parent() Sequencable {
 	if s.parent == nil {
 		return nil
 	}
-	return s.parent.Seq()
+	return s.parent.Parent()
 }
 
 //NewBaseSequence returns a base sequence struct
@@ -220,9 +211,19 @@ func (l *MapSequence) Iterator() Iterable {
 	return NewMapIterator(l.data)
 }
 
-//Seq returns the sequence as a sequencable
-func (l *MapSequence) Seq() Sequencable {
+//Parent returns the sequence as a sequencable
+func (l *MapSequence) Parent() Sequencable {
 	return Sequencable(l)
+}
+
+//Value returns a the final value of a sequence operation
+func (l *MapSequence) Value() interface{} {
+	return l.Obj()
+}
+
+//Value returns a the final value of a sequence operation
+func (l *ListSequence) Value() interface{} {
+	return l.Obj()
 }
 
 //Get retrieves the value
@@ -302,12 +303,8 @@ func (l *MapSequence) Values() ListSequencable {
 	kl := NewListSequence(nil, 0)
 	it := l.Iterator()
 
-	for it.HasNext() {
-		err := it.Next()
-
-		if err != ErrBADINDEX {
-			kl.Add(it.Value())
-		}
+	for it.Next() == nil {
+		kl.Add(it.Value())
 	}
 
 	return kl
@@ -318,12 +315,8 @@ func (l *MapSequence) Keys() ListSequencable {
 	kl := NewListSequence(nil, 0)
 	it := l.Iterator()
 
-	for it.HasNext() {
-		err := it.Next()
-
-		if err != ErrBADINDEX {
-			kl.Add(it.Key())
-		}
+	for it.Next() == nil {
+		kl.Add(it.Key())
 	}
 
 	return kl
@@ -362,8 +355,8 @@ func (l *ListSequence) Iterator() Iterable {
 	return NewListIterator(l.data)
 }
 
-//Seq returns the sequence as a sequencable
-func (l *ListSequence) Seq() Sequencable {
+//Parent returns the sequence as a sequencable
+func (l *ListSequence) Parent() Sequencable {
 	return Sequencable(l)
 }
 
@@ -377,12 +370,8 @@ func (l *ListSequence) Keys() ListSequencable {
 	kl := NewListSequence(nil, 0)
 	keys := l.Iterator()
 
-	for keys.HasNext() {
-		err := keys.Next()
-
-		if err != ErrBADINDEX {
-			kl.Add(keys.Key())
-		}
+	for keys.Next() == nil {
+		kl.Add(keys.Key())
 	}
 
 	return kl
@@ -530,12 +519,16 @@ func NewGenerativeIterator(p ProcFunc) *GenerativeIterator {
 }
 
 //HasNext calls the next item
-func (l *GenerativeIterator) HasNext() bool {
+func (l *GenerativeIterator) hasNext() bool {
 	return l.can
 }
 
 //Next moves to the next item
 func (l *GenerativeIterator) Next() error {
+	if !l.hasNext() {
+		return ErrBADINDEX
+	}
+
 	v, k, err := l.proc(l)
 
 	if err == ErrBADValue {
@@ -607,11 +600,6 @@ func NewBaseIterator(b Iterable, fn ProcFunc) *BaseIterator {
 		nil,
 		fn,
 	}
-}
-
-//HasNext calls the next item
-func (l *BaseIterator) HasNext() bool {
-	return l.parent.HasNext()
 }
 
 //Next moves to the next item
@@ -745,7 +733,7 @@ func NewListIterator(b []interface{}) *ListIterator {
 }
 
 //HasNext calls the next item
-func (l *ListIterator) HasNext() bool {
+func (l *ListIterator) hasNext() bool {
 	if len(l.data) > 0 {
 		if l.index < 0 || l.index < (len(l.data)-1) {
 			return true
@@ -756,7 +744,7 @@ func (l *ListIterator) HasNext() bool {
 
 //Next moves to the next item
 func (l *ListIterator) Next() error {
-	if !l.HasNext() {
+	if !l.hasNext() {
 		return ErrENDINDEX
 	}
 	l.index++

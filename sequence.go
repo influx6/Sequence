@@ -27,7 +27,6 @@ type ProcFunc func(f Iterable) (interface{}, interface{}, error)
 //Iterable defines sequence method rules
 type Iterable interface {
 	Next() error
-	// HasNext() bool
 	Key() interface{}
 	Value() interface{}
 	Reset()

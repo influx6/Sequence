@@ -1,4 +1,7 @@
 #Sequence
+[![GoDoc](http://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](http://godoc.org/github.com/influx6/sequence)
+[![Travis](https://travis-ci.org/influx6/sequence.svg?branch=master)](https://travis-ci.org/influx6/sequence)
+
  This is a library providing sequence like structures for go that practically allow any type of operations to be performed without creating intermediary data and allows a vast use cases
 
 ##Example
